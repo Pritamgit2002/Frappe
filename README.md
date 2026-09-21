@@ -48,6 +48,8 @@ Browser ──► Next.js :3000 ──── REST (server-side) ────► 
 | pkg-config, mariadb-connector-c | – | build the `mysqlclient` driver | `brew install pkg-config mariadb-connector-c` |
 | git | – | bench clones Frappe | Xcode command line tools |
 
+`node@24` and `mariadb@11.8` are keg-only in Homebrew (not on your PATH). The backend scripts add them to PATH themselves, so your shell can keep any Node ≥ 20.9 for the web app, and `bench` (installed under `~/.local/bin`) is found the same way.
+
 `wkhtmltopdf` is only needed if you generate PDFs; this app doesn't.
 
 Staying on an older Node? Set `FRAPPE_BRANCH=version-15` in `.env` (Python 3.10 to 3.14, Node ≥ 20.9). The app code works on both; v16 is the default because it's the current release.
@@ -56,41 +58,34 @@ Staying on an older Node? Set `FRAPPE_BRANCH=version-15` in `.env` (Python 3.10 
 
 ### Environment variables
 
-Everything lives in one root `.env` (copy `.env.example`). The setup scripts read it directly and `apps/web` loads it through `dotenv-cli`.
+Everything lives in one root `.env`. `npm run setup:api` creates it from `.env.example` on first run and fills the passwords with generated values (file mode 600, git-ignored); values you set yourself are never overwritten. The setup scripts read it directly and `apps/web` loads it through `dotenv-cli`.
 
-| Variable | Required | Default | Used for |
-| --- | --- | --- | --- |
-| `FRAPPE_ADMIN_PASSWORD` | yes | – | Password of the site's `Administrator` (Frappe desk login) |
-| `MARIADB_ROOT_PASSWORD` | yes | – | bench logs in as MariaDB root once to create the site's database and user |
-| `MARIADB_ROOT_USERNAME` | no | `root` | ↑ |
-| `FRAPPE_SITE_NAME` | no | `todo.localhost` | Site name; the web app also sends it as `X-Frappe-Site-Name` |
-| `FRAPPE_BRANCH` | no | `version-16` | Frappe branch bench clones |
-| `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` / `DEMO_USER_NAME` | no | `demo@example.com` / – / `Demo User` | Demo end-user (role `Todo User` only). Leave the password empty to skip |
-| `FRAPPE_URL` | no | `http://127.0.0.1:8000` | Where the Next.js **server** reaches Frappe. Never sent to the browser |
-| `PORT` | no | `3000` | Next.js port |
-| `MYSQL_UNIX_PORT` | no | `/tmp/mysql.sock` | Only if MariaDB's socket lives elsewhere |
+| Variable | Default | Used for |
+| --- | --- | --- |
+| `FRAPPE_ADMIN_PASSWORD` | generated | Password of the site's `Administrator` (Frappe desk login) |
+| `MARIADB_ROOT_USERNAME` / `MARIADB_ROOT_PASSWORD` | `frappe_admin` / generated | The MariaDB admin login bench uses once to create the site's database and user (see below) |
+| `FRAPPE_SITE_NAME` | `todo.localhost` | Site name; the web app also sends it as `X-Frappe-Site-Name` |
+| `FRAPPE_BRANCH` | `version-16` | Frappe branch bench clones |
+| `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` / `DEMO_USER_NAME` | `demo@example.com` / generated / `Demo User` | Demo end-user (role `Todo User` only). Empty the password to skip the user |
+| `FRAPPE_URL` | `http://127.0.0.1:8000` | Where the Next.js **server** reaches Frappe. Never sent to the browser |
+| `PORT` | `3000` | Next.js port |
+| `MYSQL_UNIX_PORT` | `/tmp/mysql.sock` | Only if MariaDB's socket lives elsewhere |
 
 Use `127.0.0.1` rather than `localhost` in `FRAPPE_URL`: Node may resolve `localhost` to `::1`, where Frappe isn't listening.
 
 ## Quick start
 
 ```bash
-cp .env.example .env        # then set FRAPPE_ADMIN_PASSWORD, MARIADB_ROOT_PASSWORD, DEMO_USER_PASSWORD
 npm install
-npm run doctor              # fix anything it reports
-npm run setup:api           # bench init, create site, install todo_app, create demo user (a few minutes)
-npm run dev                 # Frappe on :8000 + Next.js on :3000
+npm run setup:api    # .env + MariaDB admin login, bench init, site, todo_app, demo user (a few minutes)
+npm run dev          # Frappe on :8000 + Next.js on :3000
 ```
 
-Then open <http://localhost:3000> and sign in as the demo user. Frappe's desk is at <http://127.0.0.1:8000/app> (user `Administrator`).
+Then open <http://localhost:3000> and sign in as the demo user (`DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD` in `.env`). Frappe's desk is at <http://127.0.0.1:8000/app> (user `Administrator`, password `FRAPPE_ADMIN_PASSWORD`).
 
-`setup:api` is safe to re-run: it skips whatever already exists.
+`setup:api` is safe to re-run: it skips whatever already exists. `npm run doctor` (read-only) shows what's missing at any point.
 
-MariaDB's Homebrew root account has no password. Give it one (and put the same one in `.env`):
-
-```bash
-mariadb -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('<password>'); FLUSH PRIVILEGES;"
-```
+**About the MariaDB login.** Homebrew's MariaDB `root` only accepts the OS user `root` over the unix socket, so it can't log in with a password, which `bench new-site` needs. Homebrew does make your macOS user an admin over the socket, so on first run `setup:api` uses that (no password, no sudo) to create a dedicated `frappe_admin@localhost` account with the generated password from `.env`. If you'd rather use an account you already have, set `MARIADB_ROOT_USERNAME` and `MARIADB_ROOT_PASSWORD` in `.env` yourself and setup leaves MariaDB alone.
 
 ## Scripts (run from the repo root)
 
@@ -142,6 +137,7 @@ Full reference with curl examples, token auth and error shapes: [docs/API.md](do
 | Web app shows "Couldn't load your todos" | Frappe isn't running or `FRAPPE_URL` is wrong. Check `http://localhost:3000/api/health` |
 | `npm run doctor`: Node too old | Frappe v16 needs Node ≥ 24 (`nvm use`, reads `.nvmrc`) |
 | `bench init` fails midway | `rm -rf apps/api/bench` and re-run `npm run setup:api` |
-| Can't log in to the desk as Administrator | It's `FRAPPE_ADMIN_PASSWORD` from `.env` at site-creation time. Reset: `cd apps/api/bench && bench --site <site> set-admin-password <new>` |
+| Can't log in to the desk as Administrator | It's `FRAPPE_ADMIN_PASSWORD` from `.env` at site-creation time (changing `.env` later doesn't change it). Reset: `cd apps/api/bench && bench --site <site> set-admin-password <new>` |
+| `setup:api`: "Couldn't create the MariaDB account" | MariaDB isn't running (`brew services start mariadb@11.8`), or your macOS user isn't a MariaDB admin. The error prints the `sudo` fallback |
 | Login loops in Safari on a production build | `next start` marks the cookie `Secure`, which Safari refuses over plain `http://localhost`. Use Chrome/Firefox, or serve over HTTPS |
 | Port 8000 / 3000 busy | Stop the other process; for Next.js set `PORT` in `.env` |

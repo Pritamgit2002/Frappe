@@ -19,10 +19,14 @@ info "Environment (Frappe branch: $FRAPPE_BRANCH, site: $FRAPPE_SITE_NAME)"
 if [[ -f "$ROOT_DIR/.env" ]]; then
   pass ".env found"
 else
-  miss ".env not found" "cp .env.example .env   (then fill in the passwords)"
+  miss ".env not found" "npm run setup:api creates it with generated passwords   (or: cp .env.example .env and fill it in)"
 fi
 for var in FRAPPE_ADMIN_PASSWORD MARIADB_ROOT_PASSWORD; do
-  if [[ -n "${!var:-}" ]]; then pass "$var is set"; else miss "$var is empty" "set it in .env"; fi
+  if [[ -n "${!var:-}" ]]; then
+    pass "$var is set"
+  else
+    miss "$var is empty" "set it in .env, or leave it empty and npm run setup:api generates it"
+  fi
 done
 
 # --- toolchain --------------------------------------------------------------------------------------
@@ -112,9 +116,10 @@ else
     fi
   else
     miss "cannot log in to MariaDB as '$MARIADB_ROOT_USERNAME' with MARIADB_ROOT_PASSWORD" \
-      "brew services start mariadb@11.8, then give root a password:
-             $DB_CLIENT -u root -e \"ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('<password>'); FLUSH PRIVILEGES;\"
-             and put the same password in .env"
+      "is MariaDB running?  brew services start mariadb@11.8
+             Homebrew's 'root' only accepts the OS user root, so it can't log in with a password. Leave
+             MARIADB_ROOT_PASSWORD empty and run npm run setup:api: it creates a '$MANAGED_DB_USER' admin
+             login for you (or create your own admin account and put its login in .env)"
   fi
 fi
 

@@ -123,3 +123,117 @@ require_bench() {
     die "Bench not set up yet. Run: npm run setup:api"
   fi
 }
+
+# --- first-run bootstrap (used by setup.sh) -------------------------------------------------------
+
+# Dedicated MariaDB admin that bench uses to create the site's database. Homebrew's own `root` only
+# accepts the OS user `root` (unix_socket), so it can't be used with a password.
+MANAGED_DB_USER="frappe_admin"
+
+gen_secret() { openssl rand -base64 24 | tr -d '/+=\n' | cut -c1-24; }
+
+# set_env_value KEY VALUE: edit ROOT/.env in place (append if missing) and export it for this run.
+set_env_value() {
+  local key="$1" value="$2" file="$ROOT_DIR/.env" tmp line found=0
+  tmp="$(mktemp)"
+  if [[ -f "$file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "${line%%=*}" == "$key" ]]; then
+        printf '%s=%s\n' "$key" "$value" >> "$tmp"
+        found=1
+      else
+        printf '%s\n' "$line" >> "$tmp"
+      fi
+    done < "$file"
+  fi
+  if (( found == 0 )); then
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  fi
+  cat "$tmp" > "$file"
+  rm -f "$tmp"
+  chmod 600 "$file"
+  export "$key=$value"
+}
+
+# fill_secret KEY: give KEY a generated value if it is empty.
+fill_secret() {
+  if [[ -z "${!1:-}" ]]; then
+    set_env_value "$1" "$(gen_secret)"
+    info "Generated $1 (saved in .env)"
+  fi
+  return 0
+}
+
+# Create .env from the example on first run and fill in whatever would otherwise block setup.
+# Existing non-empty values are never touched. DEMO_USER_PASSWORD is only generated for a brand-new .env,
+# because leaving it empty is how you opt out of the demo user.
+ensure_env_file() {
+  local created=0
+  if [[ ! -f "$ROOT_DIR/.env" ]]; then
+    info "Creating .env from .env.example"
+    cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"
+    chmod 600 "$ROOT_DIR/.env"
+    created=1
+    load_env
+  fi
+
+  fill_secret FRAPPE_ADMIN_PASSWORD
+  if [[ -z "${MARIADB_ROOT_PASSWORD:-}" ]]; then
+    set_env_value MARIADB_ROOT_USERNAME "$MANAGED_DB_USER"
+    set_env_value MARIADB_ROOT_PASSWORD "$(gen_secret)"
+    info "Generated a MariaDB admin login ($MANAGED_DB_USER, saved in .env)"
+  fi
+  if (( created )); then
+    fill_secret DEMO_USER_PASSWORD
+  fi
+  return 0
+}
+
+db_client() { command -v mariadb || command -v mysql || true; }
+
+# Escape a value for a single-quoted MariaDB string literal: \ becomes \\ and ' becomes ''.
+# (sed, not ${var//x/y}: bash 3.2 and 5 disagree about backslashes in that replacement.)
+sql_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e "s/'/''/g"; }
+
+# db_login_ok USER PASSWORD: can we log in over the default socket? (Password goes via env, not argv.)
+db_login_ok() {
+  local client
+  client="$(db_client)"
+  [[ -n "$client" ]] && MYSQL_PWD="$2" "$client" -u "$1" --batch --skip-column-names -e 'SELECT 1' >/dev/null 2>&1
+}
+
+# If .env points at the managed admin account and it can't log in yet, create it. This connects as
+# your macOS user, which Homebrew's MariaDB makes an admin over the unix socket (no password, no sudo).
+ensure_db_admin() {
+  local client pw sql
+  if [[ "$MARIADB_ROOT_USERNAME" != "$MANAGED_DB_USER" ]]; then
+    return 0
+  fi
+  if db_login_ok "$MARIADB_ROOT_USERNAME" "$MARIADB_ROOT_PASSWORD"; then
+    return 0
+  fi
+
+  client="$(db_client)"
+  if [[ -z "$client" ]]; then
+    die "MariaDB client not found. Run: npm run doctor"
+  fi
+
+  info "Creating MariaDB admin account '$MANAGED_DB_USER' (needs MariaDB running)"
+  pw="$(sql_escape "$MARIADB_ROOT_PASSWORD")"
+  sql="CREATE USER IF NOT EXISTS '$MANAGED_DB_USER'@'localhost' IDENTIFIED BY '$pw';
+ALTER USER '$MANAGED_DB_USER'@'localhost' IDENTIFIED BY '$pw';
+GRANT ALL PRIVILEGES ON *.* TO '$MANAGED_DB_USER'@'localhost' WITH GRANT OPTION;"
+
+  # SQL goes over stdin so the password never appears in a process listing.
+  if ! printf '%s\n' "$sql" | "$client" --batch 2>/dev/null; then
+    die "Couldn't create the MariaDB account as your macOS user (is MariaDB running? brew services start mariadb@11.8).
+    Do it by hand as MariaDB's OS-level root instead:
+      sudo $client -u root -e \"CREATE USER '$MANAGED_DB_USER'@'localhost' IDENTIFIED BY '<password>'; GRANT ALL PRIVILEGES ON *.* TO '$MANAGED_DB_USER'@'localhost' WITH GRANT OPTION;\"
+    and put the same password in .env as MARIADB_ROOT_PASSWORD."
+  fi
+
+  if ! db_login_ok "$MARIADB_ROOT_USERNAME" "$MARIADB_ROOT_PASSWORD"; then
+    die "Created '$MANAGED_DB_USER' but still can't log in with it. Check MARIADB_ROOT_PASSWORD in .env."
+  fi
+  return 0
+}

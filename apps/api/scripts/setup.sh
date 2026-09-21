@@ -5,6 +5,11 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 init_env
 
+# First run: create .env with generated passwords and the MariaDB admin account bench needs.
+# Both are no-ops when already in place, and never overwrite values you set yourself.
+ensure_env_file
+ensure_db_admin
+
 bash "$SCRIPTS_DIR/doctor.sh"
 
 # `bench` must run inside the bench directory.
