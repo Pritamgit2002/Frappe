@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Frappe convention (matches the ruff config in todo_app/pyproject.toml)
+[*.py]
+indent_style = tab
+
+# Frappe writes DocType JSON with one-space indentation
+[apps/api/todo_app/**/*.json]
+indent_size = 1
+
+[*.md]
+trim_trailing_whitespace = false

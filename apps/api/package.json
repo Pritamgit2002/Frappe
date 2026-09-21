@@ -1,0 +1,13 @@
+{
+  "name": "@todo/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frappe backend (bench + todo_app). Python project; this package.json only exposes scripts so the monorepo can drive it.",
+  "scripts": {
+    "doctor": "bash scripts/doctor.sh",
+    "setup": "bash scripts/setup.sh",
+    "dev": "bash scripts/dev.sh",
+    "migrate": "bash scripts/migrate.sh",
+    "test": "bash scripts/test.sh"
+  }
+}

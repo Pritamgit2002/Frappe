@@ -1,0 +1,28 @@
+{
+  "name": "frappe-todo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo: Next.js frontend + Frappe (MariaDB) backend. A Todo app over the Frappe REST API.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @todo/api",
+    "dev:web": "npm run dev -w @todo/web",
+    "build": "npm run build -w @todo/web",
+    "start": "npm run start -w @todo/web",
+    "lint": "npm run lint -w @todo/web",
+    "typecheck": "npm run typecheck -w @todo/web",
+    "doctor": "npm run doctor -w @todo/api",
+    "setup:api": "npm run setup -w @todo/api",
+    "migrate": "npm run migrate -w @todo/api",
+    "test:api": "npm run test -w @todo/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

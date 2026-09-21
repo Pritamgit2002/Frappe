@@ -1,0 +1,55 @@
+# Manual REST requests for the Frappe backend.
+# Works with the VS Code "REST Client" extension and JetBrains' built-in HTTP client.
+#
+# Uses token auth (no login step). Create the key pair once, as a System Manager:
+#   cd apps/api/bench
+#   bench --site todo.localhost execute frappe.core.doctype.user.user.generate_keys --kwargs "{'user': 'demo@example.com'}"
+# then paste api_key / api_secret below. Don't commit real values.
+
+@base = http://127.0.0.1:8000
+@apiKey = <api_key>
+@apiSecret = <api_secret>
+@auth = token {{apiKey}}:{{apiSecret}}
+
+### Liveness (no auth)
+GET {{base}}/api/method/ping
+
+### Who am I
+GET {{base}}/api/method/todo_app.api.me
+Authorization: {{auth}}
+
+### Counts per status
+GET {{base}}/api/method/todo_app.api.stats
+Authorization: {{auth}}
+
+### List: open items, newest first
+GET {{base}}/api/resource/Todo%20Item?fields=["name","title","status","priority","due_date","completed_at"]&filters=[["status","=","Open"]]&order_by=creation desc&limit_page_length=20
+Authorization: {{auth}}
+
+### Create
+POST {{base}}/api/resource/Todo%20Item
+Authorization: {{auth}}
+Content-Type: application/json
+
+{
+  "title": "Write the API docs",
+  "priority": "High",
+  "due_date": "2026-10-01"
+}
+
+### Read one
+GET {{base}}/api/resource/Todo%20Item/TODO-00001
+Authorization: {{auth}}
+
+### Update: mark done (completed_at is stamped by the server)
+PUT {{base}}/api/resource/Todo%20Item/TODO-00001
+Authorization: {{auth}}
+Content-Type: application/json
+
+{
+  "status": "Done"
+}
+
+### Delete
+DELETE {{base}}/api/resource/Todo%20Item/TODO-00001
+Authorization: {{auth}}
