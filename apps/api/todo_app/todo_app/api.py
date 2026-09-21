@@ -34,7 +34,7 @@ def stats() -> dict:
 	rows = frappe.get_list(
 		TODO_DOCTYPE,
 		filters={"owner": frappe.session.user},
-		fields=["status", "count(name) as count"],
+		fields=["status", {"COUNT": "*", "as": "count"}],  # v16: SQL functions must use dict syntax
 		group_by="status",
 	)
 

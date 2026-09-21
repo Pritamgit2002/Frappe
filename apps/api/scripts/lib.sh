@@ -237,3 +237,36 @@ GRANT ALL PRIVILEGES ON *.* TO '$MANAGED_DB_USER'@'localhost' WITH GRANT OPTION;
   fi
   return 0
 }
+
+# --- Redis for one-off bench commands ------------------------------------------------------------
+
+# `bench migrate`, `execute` and `run-tests` refuse to run without Redis, which `bench start` normally
+# provides. Start bench's own instances if nothing is listening yet, and stop just those on exit.
+BENCH_REDIS_PIDS=""
+
+stop_bench_redis() {
+  if [[ -n "$BENCH_REDIS_PIDS" ]]; then
+    kill $BENCH_REDIS_PIDS 2>/dev/null || true
+  fi
+  return 0
+}
+
+start_bench_redis() {
+  local name port i
+  for name in redis_cache redis_queue; do
+    port="$(awk '$1=="port"{print $2}' "$BENCH_DIR/config/$name.conf")"
+    if redis-cli -p "$port" ping >/dev/null 2>&1; then
+      continue   # already running (e.g. `npm run dev` is up)
+    fi
+    ( cd "$BENCH_DIR" && exec redis-server "config/$name.conf" ) >/dev/null 2>&1 &
+    BENCH_REDIS_PIDS="$BENCH_REDIS_PIDS $!"
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      if redis-cli -p "$port" ping >/dev/null 2>&1; then break; fi
+      sleep 0.5
+    done
+  done
+  if [[ -n "$BENCH_REDIS_PIDS" ]]; then
+    trap stop_bench_redis EXIT
+  fi
+  return 0
+}

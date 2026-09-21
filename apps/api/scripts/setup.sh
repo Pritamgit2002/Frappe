@@ -66,6 +66,9 @@ info "Pinning $FRAPPE_SITE_NAME as the default site and enabling developer mode"
 in_bench bench use "$FRAPPE_SITE_NAME"
 in_bench bench set-config -g developer_mode 1
 
+info "Starting bench's Redis for the remaining steps (stopped again when setup ends)"
+start_bench_redis
+
 info "Migrating (syncs DocType changes)"
 in_bench bench --site "$FRAPPE_SITE_NAME" migrate
 
