@@ -52,18 +52,19 @@ export interface NewTodo {
   description?: string;
 }
 
+// Create and update return nothing on purpose: Frappe's response for them omits fields that are null
+// (e.g. completed_at), so it isn't a full Todo. Callers re-list, which asks for every field.
+
 /** POST /api/resource/Todo Item */
-export async function createTodo(sid: string, todo: NewTodo): Promise<Todo> {
-  const { data } = await frappeJson<{ data: Todo }>(resourcePath(), { method: "POST", sid, body: todo });
-  return data;
+export async function createTodo(sid: string, todo: NewTodo): Promise<void> {
+  await frappeJson<unknown>(resourcePath(), { method: "POST", sid, body: todo });
 }
 
 export type TodoPatch = Partial<Pick<Todo, "title" | "description" | "status" | "priority" | "due_date">>;
 
 /** PUT /api/resource/Todo Item/<name>: only the fields you send are changed. */
-export async function updateTodo(sid: string, name: string, patch: TodoPatch): Promise<Todo> {
-  const { data } = await frappeJson<{ data: Todo }>(resourcePath(name), { method: "PUT", sid, body: patch });
-  return data;
+export async function updateTodo(sid: string, name: string, patch: TodoPatch): Promise<void> {
+  await frappeJson<unknown>(resourcePath(name), { method: "PUT", sid, body: patch });
 }
 
 /** DELETE /api/resource/Todo Item/<name> */

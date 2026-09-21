@@ -37,6 +37,7 @@ export async function logout(sid: string): Promise<void> {
  * (Frappe then treats the request as Guest). Throws FrappeError if Frappe can't be reached.
  */
 export async function whoAmI(sid: string): Promise<SessionUser | null> {
-  const { message } = await frappeJson<{ message: SessionUser | null }>("/api/method/todo_app.api.me", { sid });
-  return message;
+  // For a guest the method returns None, and Frappe then leaves `message` out of the response entirely.
+  const { message } = await frappeJson<{ message?: SessionUser | null }>("/api/method/todo_app.api.me", { sid });
+  return message ?? null;
 }

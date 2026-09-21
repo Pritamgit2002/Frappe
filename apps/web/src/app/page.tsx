@@ -18,6 +18,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     getTodoStats(sid),
   ]);
 
+  console.log(stats);
+
   // Computed once on the server and passed down, so server and client agree on what "overdue" means.
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
 
@@ -26,7 +28,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Todos</h1>
-          <p className="mt-1 text-sm text-neutral-500">Signed in as {user.full_name}</p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Signed in as {user.full_name}
+          </p>
         </div>
         <form action={logout}>
           <button
@@ -43,7 +47,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
       {todos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">
-          {status ? `Nothing is "${status}" right now.` : "No todos yet. Add your first one above."}
+          {status
+            ? `Nothing is "${status}" right now.`
+            : "No todos yet. Add your first one above."}
         </p>
       ) : (
         <ul className="space-y-2">

@@ -17,7 +17,7 @@ BASE=http://127.0.0.1:8000
 curl -s -c cookies.txt -X POST "$BASE/api/method/login" \
   -H 'Content-Type: application/json' \
   -d '{"usr":"demo@example.com","pwd":"<password>"}'
-# {"message":"Logged In","home_page":"/app","full_name":"Demo User"}
+# {"message":"No App","home_page":"/me","full_name":"Demo User"}   (desk users get "Logged In" and "/app")
 ```
 
 **API token** is better for scripts: no login step, no cookie. Send `Authorization: token <api_key>:<api_secret>`. Generate a pair as a System Manager, in the desk under User → *API Access* → *Generate Keys*, or:
@@ -35,7 +35,7 @@ bench --site todo.localhost execute frappe.core.doctype.user.user.generate_keys 
 | --- | --- | --- |
 | `POST` | `/api/method/login` | Log in (`usr`, `pwd`); sets `sid` |
 | `POST` | `/api/method/logout` | End the session |
-| `GET` | `/api/method/todo_app.api.me` | `{"user","full_name"}`, or `null` for a guest / expired session |
+| `GET` | `/api/method/todo_app.api.me` | `{"message":{"user","full_name"}}`; for a guest / expired session the response is `{}` (no `message` key) |
 | `GET` | `/api/method/todo_app.api.stats` | Counts per status for the current user |
 | `GET` | `/api/resource/Todo%20Item` | List (filters, fields, ordering, paging below) |
 | `POST` | `/api/resource/Todo%20Item` | Create |
@@ -82,7 +82,7 @@ curl -s -b cookies.txt -X PUT "$BASE/api/resource/Todo%20Item/TODO-00001" \
 
 # Delete
 curl -s -b cookies.txt -X DELETE "$BASE/api/resource/Todo%20Item/TODO-00001"
-# {"message":"ok"}
+# {"data":"ok"}
 
 # Counts
 curl -s -b cookies.txt "$BASE/api/method/todo_app.api.stats"
