@@ -27,7 +27,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     <main className="mx-auto w-full max-w-2xl px-4 py-10">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Todos</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Todosdasd</h1>
           <p className="mt-1 text-sm text-neutral-500">
             Signed in as {user.full_name}
           </p>
